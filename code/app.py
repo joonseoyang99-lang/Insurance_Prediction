@@ -1,5 +1,4 @@
 import streamlit as st
-import pandas as pd
 import numpy as np
 import joblib
 from pathlib import Path
@@ -7,7 +6,6 @@ from pathlib import Path
 DIR = Path(__file__).parent
 
 model = joblib.load(DIR / "best_model.pkl")
-model_spec = joblib.load(DIR / "model_spec.pkl")
 feature_order = joblib.load(DIR / "feature_order.pkl")
 
 def make_age_group(age: int) -> str:
@@ -29,6 +27,26 @@ def make_bmi_category(bmi: float) -> str:
         return "overweight"
     else:
         return "obese"
+
+def build_input(age, bmi, children, bloodpressure, gender, diabetic, smoker, region):
+    raw = {
+        "gender": gender,
+        "bloodpressure": float(bloodpressure),
+        "diabetic": diabetic,
+        "children": float(children),
+        "smoker": smoker,
+        "region": region,
+        "age_group": make_age_group(age),
+        "bmi_category": make_bmi_category(bmi),
+    }
+    row = {}
+    for feat in feature_order:
+        if "[" in feat:
+            col, val = feat.rstrip("]").split("[")
+            row[feat] = 1.0 if str(raw[col]) == val else 0.0
+        else:
+            row[feat] = raw[feat]
+    return np.array([list(row.values())], dtype=np.float32)
 
 st.set_page_config(page_title="Insurance Claim Predictor", layout="centered")
 st.title("Health Insurance Payment Prediction App")
@@ -52,43 +70,6 @@ with st.form("input_form"):
     submitted = st.form_submit_button("Predict Payment")
 
 if submitted:
-    age_group = make_age_group(age)
-    bmi_category = make_bmi_category(bmi)
-
-    input_data = pd.DataFrame({
-        "Id": [0],
-        "claim": [0.0],
-        "age": [age],
-        "bmi": [bmi],
-        "gender": [gender],
-        "diabetic": [diabetic],
-        "smoker": [smoker],
-        "region": [region],
-        "bloodpressure": [bloodpressure],
-        "children": [children],
-        "age_group": [age_group],
-        "bmi_category": [bmi_category],
-    })
-
-    for c in ["gender", "region", "bmi_category"]:
-        input_data[c] = input_data[c].str.lower()
-
-    training_categories = {
-        "gender": ["female", "male"],
-        "diabetic": ["No", "Yes"],
-        "smoker": ["No", "Yes"],
-        "region": ["northeast", "northwest", "southeast", "southwest"],
-        "age_group": ["Youth", "Young Adults", "Middle Age", "Senior"],
-        "bmi_category": ["underweight", "normal", "overweight", "obese"]
-    }
-
-    for col, cats in training_categories.items():
-        input_data[col] = pd.Categorical(input_data[col], categories=cats)
-
-    X_input_df = model_spec.transform(input_data)
-    X_input_df = X_input_df.reindex(columns=feature_order, fill_value=0)
-
-
-    X_in = X_input_df.to_numpy(dtype=np.float32)
-    prediction = float(model.predict(X_in)[0])
+    X = build_input(age, bmi, children, bloodpressure, gender, diabetic, smoker, region)
+    prediction = float(model.predict(X)[0])
     st.success(f"**Estimated Insurance Payment Amount:** ${prediction:,.2f}")
