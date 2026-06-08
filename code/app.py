@@ -2,10 +2,13 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
+from pathlib import Path
 
-model = joblib.load("best_model.pkl")
-model_spec = joblib.load("model_spec.pkl")
-feature_order = joblib.load("feature_order.pkl")
+DIR = Path(__file__).parent
+
+model = joblib.load(DIR / "best_model.pkl")
+model_spec = joblib.load(DIR / "model_spec.pkl")
+feature_order = joblib.load(DIR / "feature_order.pkl")
 
 def make_age_group(age: int) -> str:
     if age < 25:
